@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts           Account[]
+  sessions           Session[]
+  transactions       Transaction[]
+  debts              Debt[]
+  alerts             Alert[]
+  uploads            StatementUpload[]
+  settings           UserSettings?
+  auditLogs          AuditLog[]
+  subscription       Subscription?
+  onboardingComplete Boolean           @default(false)
+  skippedDebtOnboarding Boolean        @default(false)
+  debtPromptDismissedAt DateTime?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model StatementUpload {
+  id          String   @id @default(cuid())
+  userId      String
+  fileName    String
+  status      String   @default("pending") // pending | parsing | complete | failed
+  parsePct    Int      @default(0)
+  errorMessage String?
+  createdAt   DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  uploadId    String?
+  date        DateTime
+  description String
+  amount      Float
+  balance     Float?
+  category    String
+  type        String // income | expense
+  needsReview Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  upload StatementUpload? @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+}
+
+model Debt {
+  id               String    @id @default(cuid())
+  userId           String
+  name             String
+  balance          Float
+  interestRateApr  Float
+  minimumPayment   Float
+  dueDayOfMonth    Int?
+  autoExtracted    Boolean   @default(false)
+  verified         Boolean   @default(false)
+  rejected         Boolean   @default(false)
+  rejectionReason  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSettings {
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  theme                     String   @default("system") // light | dark | system
+  highContrast              Boolean  @default(false)
+  extraPaymentMonthly       Float    @default(0)
+  extraPaymentConfirmedAt   DateTime?
+  previousExtraPayment      Float?
+  selectedStrategy          String? // snowball | avalanche | null
+  strategyOverrideReason    String?
+  rebalanceChoice           String? // stretch | reoptimize — last user choice
+  lastDisposableIncome      Float?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String // spending_spike | debt_pace | negative_income | info
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  meta      String? // JSON
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  stripeCustomerId String?
+  stripeSubId      String?
+  status           String    @default("inactive") // inactive | trialing | active | past_due | canceled
+  currentPeriodEnd DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
