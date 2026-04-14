@@ -1,17 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginForm() {
   const sp = useSearchParams();
   const callbackUrl = sp.get("callbackUrl") ?? "/dashboard";
+  const fromSignup = sp.get("from") === "signup";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const q = sp.get("email");
+    if (q) {
+      setEmail(decodeURIComponent(q));
+    }
+  }, [sp]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +46,13 @@ export default function LoginPage() {
           Create an account
         </Link>
       </p>
+
+      {fromSignup && (
+        <p className="mt-4 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-100">
+          This email already has an account. Enter your password to sign in.
+        </p>
+      )}
+
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
         <div>
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Email</label>
@@ -57,10 +73,10 @@ export default function LoginPage() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-900"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p className="text-sm text-red-600 dark:text-red-400">{err}</p>}
         <button
           type="submit"
           disabled={loading}
@@ -70,5 +86,13 @@ export default function LoginPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto flex min-h-screen max-w-md items-center justify-center px-4 text-sm text-zinc-500">Loading…</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
